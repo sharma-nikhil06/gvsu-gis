@@ -1,0 +1,122 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIS Data Collection</title>
+<style>
+    body { font-family: Arial, sans-serif; }
+    h1 { text-align: center; }
+    .container { max-width: 480px; margin: auto; padding: 20px; }
+    .form-group { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 5px; }
+    input, select, button { width: 100%; padding: 10px; }
+    #map { height: 300px; margin-bottom: 20px; border: 1px solid black; }
+</style>
+</head>
+<body>
+
+<h1>GIS Data & Video Visualization</h1>
+
+<div class="container">
+    <div id="map"></div>
+    <div class="form-group">
+        <label for="startDate">Start Date:</label>
+        <input type="date" id="startDate" required>
+    </div>
+    <div class="form-group">
+        <label for="endDate">End Date:</label>
+        <input type="date" id="endDate" required>
+    </div>
+    <div class="form-group">
+        <label for="cloudCoverageInput">Cloud Coverage (0-100):</label>
+        <input type="range" id="cloudCoverageInput" min="0" max="100" value="50">
+        <span id="cloudCoverageValue">50%</span>
+    </div>
+    <button id="saveDataButton">Save Data</button>
+</div>
+
+<script>
+document.getElementById('cloudCoverageInput').addEventListener('input', function() {
+    document.getElementById('cloudCoverageValue').textContent = this.value + '%';
+});
+
+let map;
+let drawingManager;
+let selectedShape;
+
+function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -34.397, lng: 150.644 },
+        zoom: 8,
+    });
+
+    drawingManager = new google.maps.drawing.DrawingManager({
+        drawingMode: google.maps.drawing.OverlayType.POLYGON,
+        drawingControl: true,
+        drawingControlOptions: {
+            position: google.maps.ControlPosition.TOP_CENTER,
+            drawingModes: [google.maps.drawing.OverlayType.POLYGON],
+        },
+        polygonOptions: {
+            editable: true,
+            draggable: true
+        },
+    });
+    drawingManager.setMap(map);
+
+    google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon) {
+        if (selectedShape) {
+            selectedShape.setMap(null);
+        }
+        selectedShape = polygon;
+    });
+}
+
+document.getElementById('saveDataButton').addEventListener('click', function() {
+    if (!selectedShape) {
+        alert('Please draw a polygon on the map first.');
+        return;
+    }
+
+    const coordinates = selectedShape.getPath().getArray().map(vertex => ({
+        lat: vertex.lat(),
+        lng: vertex.lng()
+    }));
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const cloudCoverage = document.getElementById('cloudCoverageInput').value;
+
+    const data = {
+        coordinates: coordinates,
+        startDate: startDate,
+        endDate: endDate,
+        cloudCoverage: cloudCoverage
+    };
+
+    fetch('/save-json', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => alert(data.message))
+    .catch(error => console.error('Error:', error));
+});
+
+</script>
+
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCWZWHE7_RsjijDrRrB-ZuSIwR1Un59DzE&callback=initMap&libraries=drawing">
+</script>
+
+</body>
+</html>
